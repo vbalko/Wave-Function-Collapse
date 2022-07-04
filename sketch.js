@@ -26,8 +26,16 @@ function removeDuplicatedTiles(tiles) {
   return Object.values(uniqueTilesMap);
 }
 
+function calculateCellSize() {
+  const w = windowWidth / DIM;
+  const h = windowHeight / DIM;
+  const size = Math.trunc(Math.min(w, h));
+  return size * DIM;
+}
+
 function setup() {
-  createCanvas(600, 600);
+  const scrSize = calculateCellSize();
+  createCanvas(scrSize, scrSize);
   //randomSeed(15);
 
   // tiles[0] = new Tile(tileImages[0], ['AAA', 'AAA', 'AAA', 'AAA']);
@@ -53,9 +61,10 @@ function setup() {
   tiles[11] = new Tile(tileImages[11], ['BCB', 'BCB', 'BBB', 'BBB']);
   tiles[12] = new Tile(tileImages[12], ['BBB', 'BCB', 'BBB', 'BCB']);
 
-  for (let i = 0; i < 12; i++) {
-    tiles[i].index = i;
-  }
+  tiles.map((item, i) => item.index = i);
+  // for (let i = 0; i < 12; i++) {
+  //   tiles[i].index = i;
+  // }
 
   const initialTileCount = tiles.length;
   for (let i = 0; i < initialTileCount; i++) {
@@ -66,22 +75,24 @@ function setup() {
     tempTiles = removeDuplicatedTiles(tempTiles);
     tiles = tiles.concat(tempTiles);
   }
-  console.log(tiles.length);
+  //console.log(tiles.length);
 
   // Generate the adjacency rules based on edges
-  for (let i = 0; i < tiles.length; i++) {
-    const tile = tiles[i];
-    tile.analyze(tiles);
-  }
+    tiles.map((tile) => tile.analyze(tiles));
+  // for (let i = 0; i < tiles.length; i++) {
+  //   const tile = tiles[i];
+  //   tile.analyze(tiles);
+  // }
 
   startOver();
 }
 
 function startOver() {
   // Create cell for each spot on the grid
-  for (let i = 0; i < DIM * DIM; i++) {
-    grid[i] = new Cell(tiles.length);
-  }
+  grid = Array(DIM * DIM).fill(0).map(item => new Cell(tiles.length));
+  // for (let i = 0; i < DIM * DIM; i++) {
+  //   grid[i] = new Cell(tiles.length);
+  // }
 }
 
 function checkValid(arr, valid) {
@@ -91,13 +102,11 @@ function checkValid(arr, valid) {
     // ARR: [BLANK, UP, RIGHT, DOWN, LEFT]
     // result in removing UP, DOWN, LEFT
     let element = arr[i];
-    // console.log(element, valid.includes(element));
+
     if (!valid.includes(element)) {
       arr.splice(i, 1);
     }
   }
-  // console.log(arr);
-  // console.log("----------");
 }
 
 function mousePressed() {
@@ -124,28 +133,39 @@ function draw() {
   }
 
   // Pick cell with least entropy
-  let gridCopy = grid.slice();
-  gridCopy = gridCopy.filter((a) => !a.collapsed);
+  // let gridCopy = grid.slice();
+  // gridCopy = gridCopy.filter((a) => !a.collapsed);
   // console.table(grid);
   // console.table(gridCopy);
 
-  if (gridCopy.length == 0) {
-    return;
-  }
-  gridCopy.sort((a, b) => {
-    return a.options.length - b.options.length;
-  });
+  // if (gridCopy.length == 0) {
+  //   return;
+  // }
+  // gridCopy.sort((a, b) => {
+  //   return a.options.length - b.options.length;
+  // });
 
-  let len = gridCopy[0].options.length;
-  let stopIndex = 0;
-  for (let i = 1; i < gridCopy.length; i++) {
-    if (gridCopy[i].options.length > len) {
-      stopIndex = i;
-      break;
-    }
-  }
+  // let len = gridCopy[0].options.length;
+  // let stopIndex = 0;
+  // for (let i = 1; i < gridCopy.length; i++) {
+  //   if (gridCopy[i].options.length > len) {
+  //     stopIndex = i;
+  //     break;
+  //   }
+  // }
 
-  if (stopIndex > 0) gridCopy.splice(stopIndex);
+  // if (stopIndex > 0) gridCopy.splice(stopIndex);
+  
+  const minEntropy = Math.min(...grid.filter(item => !item.collapsed).map(item => item.options.length));
+  // console.log(`minEntropy:${minEntropy}`);
+  let gridCopy = grid//.filter(item => !item.collapsed)
+    // .sort((a, b) => a.options.length - b.options.length)
+    .filter(item => item.options.length == minEntropy && !item.collapsed);
+  
+   if (gridCopy.length == 0) {
+     return;
+   }
+  
   const cell = random(gridCopy);
   cell.collapsed = true;
   const pick = random(cell.options);
