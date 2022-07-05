@@ -2,8 +2,10 @@ let tiles = [];
 const tileImages = [];
 
 let grid = [];
+let aProlif = [];
 
-const DIM = 20;
+const DIMX = 40;
+const DIMY = 20;
 
 function preload() {
   // const path = 'rail';
@@ -27,15 +29,15 @@ function removeDuplicatedTiles(tiles) {
 }
 
 function calculateCellSize() {
-  const w = windowWidth / DIM;
-  const h = windowHeight / DIM;
+  const w = windowWidth / DIMX;
+  const h = windowHeight / DIMY;
   const size = Math.trunc(Math.min(w, h));
-  return size * DIM;
+  return { w: size * DIMX, h: size * DIMY };
 }
 
 function setup() {
   const scrSize = calculateCellSize();
-  createCanvas(scrSize, scrSize);
+  createCanvas(scrSize.w, scrSize.h);
   //randomSeed(15);
 
   // tiles[0] = new Tile(tileImages[0], ['AAA', 'AAA', 'AAA', 'AAA']);
@@ -85,11 +87,13 @@ function setup() {
   // }
 
   startOver();
+  // noLoop();
 }
 
 function startOver() {
   // Create cell for each spot on the grid
-  grid = Array(DIM * DIM).fill(0).map(item => new Cell(tiles.length));
+  grid = Array(DIMX * DIMY).fill(0).map(item => new Cell(tiles.length));
+  grid.forEach((item, i) => item.idx = i);
   // for (let i = 0; i < DIM * DIM; i++) {
   //   grid[i] = new Cell(tiles.length);
   // }
@@ -116,21 +120,44 @@ function mousePressed() {
 function draw() {
   background(0);
 
-  const w = width / DIM;
-  const h = height / DIM;
-  for (let j = 0; j < DIM; j++) {
-    for (let i = 0; i < DIM; i++) {
-      let cell = grid[i + j * DIM];
-      if (cell.collapsed) {
-        let index = cell.options[0];
-        image(tiles[index].img, i * w, j * h, w, h);
-      } else {
-        noFill();
-        stroke(51);
-        rect(i * w, j * h, w, h);
-      }
-    }
-  }
+  const w = width / DIMX;
+  const h = height / DIMY;
+  grid.filter(item => item.collapsed).map(item => {
+    let i = item.idx % DIMX;
+    let j = Math.trunc(item.idx / DIMX);
+    let index = item.options[0];
+    image(tiles[index].img, i * w, j * h, w, h);
+  });
+
+  grid.filter(item => !item.collapsed).map(item => {
+    let i = item.idx % DIMX;
+    let j = Math.trunc(item.idx / DIMX); 
+    noFill();
+    stroke(51);
+    rect(i * w, j * h, w, h);
+  });
+
+  aProlif.filter(item => !item.collapsed).map(item => {
+    let i = item.idx % DIMX;
+    let j = Math.trunc(item.idx / DIMX);    
+    fill(51);
+    stroke(51);
+    rect(i * w, j * h, w, h);
+    noFill();
+  });
+  // for (let j = 0; j < DIMY; j++) {
+  //   for (let i = 0; i < DIMX; i++) {
+  //     let cell = grid[i + j * DIMX];
+  //     if (cell.collapsed) {
+  //       let index = cell.options[0];
+  //       image(tiles[index].img, i * w, j * h, w, h);
+  //     } else {
+  //       // noFill();
+  //       // stroke(51);
+  //       // rect(i * w, j * h, w, h);
+  //     }
+  //   }
+  // }
 
   // Pick cell with least entropy
   // let gridCopy = grid.slice();
@@ -175,58 +202,113 @@ function draw() {
   }
   cell.options = [pick];
 
+  //traversing whole array every loop is not optimal
+  //in fact, change (proliferation) is possible only in some cells
+  //noncollapse cells directly adjacent to collapsed cells
+  //prepare array of proliferating cells
+  //start with all colapsed cells
+  aProlif = grid.filter(item => item.collapsed);
+
+  //add cells adjacent to them
+  aProlif.forEach(item => {
+    //calculate i (horizontal) and j(vertical) coordinates of original cell
+    let i = item.idx % DIMX;
+    let j = Math.trunc(item.idx / DIMX);
+    //add north cell (up)
+    if (j > 0) {
+      let idx = i + (j - 1) * DIMX;
+      //add only if it isn`t already there - collapsed or already added
+      if (aProlif.filter((item) => item.idx == idx).length == 0) {
+        aProlif.push(grid[idx]);
+      }
+    }
+
+    //add east cell (right)
+    if (i < DIMX - 1) {
+      let idx = i + 1 + j * DIMX;
+      //add only if it isn`t already there - collapsed or already added
+      if (aProlif.filter((item) => item.idx == idx).length == 0) {
+        aProlif.push(grid[idx]);
+      }
+    }
+
+    //add south cell (down)
+    if (j < DIMY - 1) {
+      let idx = i + (j + 1) * DIMX;
+      //add only if it isn`t already there - collapsed or already added
+      if (aProlif.filter((item) => item.idx == idx).length == 0) {
+        aProlif.push(grid[idx]);
+      }
+    }
+
+    //add west cell (left)
+    if (i > 0) {
+      let idx = i - 1 + j * DIMX;
+      //add only if it isn`t already there - collapsed or already added
+      if (aProlif.filter((item) => item.idx == idx).length == 0) {
+        aProlif.push(grid[idx]);
+      }
+    }
+  });
+
   const nextGrid = [];
-  for (let j = 0; j < DIM; j++) {
-    for (let i = 0; i < DIM; i++) {
-      let index = i + j * DIM;
+  for (let j = 0; j < DIMY; j++) {
+    for (let i = 0; i < DIMX; i++) {
+      let index = i + j * DIMX;
+      //if not in prolif array, just copy cell without calculations
+      if (aProlif.filter(item => item.idx == index).length == 0) {
+        nextGrid[index] = grid[index];
+      } else {
       if (grid[index].collapsed) {
         nextGrid[index] = grid[index];
       } else {
         let options = new Array(tiles.length).fill(0).map((x, i) => i);
         // Look up
         if (j > 0) {
-          let up = grid[i + (j - 1) * DIM];
+          let up = grid[i + (j - 1) * DIMX];
           let validOptions = [];
           for (let option of up.options) {
             let valid = tiles[option].down;
-            validOptions = validOptions.concat(valid);
+            validOptions = [...new Set([...validOptions, ...valid])];// validOptions.concat(valid);
           }
           checkValid(options, validOptions);
         }
         // Look right
-        if (i < DIM - 1) {
-          let right = grid[i + 1 + j * DIM];
+        if (i < DIMX - 1) {
+          let right = grid[i + 1 + j * DIMX];
           let validOptions = [];
           for (let option of right.options) {
             let valid = tiles[option].left;
-            validOptions = validOptions.concat(valid);
+            validOptions = [...new Set([...validOptions, ...valid])];//validOptions.concat(valid);
           }
           checkValid(options, validOptions);
         }
         // Look down
-        if (j < DIM - 1) {
-          let down = grid[i + (j + 1) * DIM];
+        if (j < DIMY - 1) {
+          let down = grid[i + (j + 1) * DIMX];
           let validOptions = [];
           for (let option of down.options) {
             let valid = tiles[option].up;
-            validOptions = validOptions.concat(valid);
+            validOptions = [...new Set([...validOptions, ...valid])];//validOptions.concat(valid);
           }
           checkValid(options, validOptions);
         }
         // Look left
         if (i > 0) {
-          let left = grid[i - 1 + j * DIM];
+          let left = grid[i - 1 + j * DIMX];
           let validOptions = [];
           for (let option of left.options) {
             let valid = tiles[option].right;
-            validOptions = validOptions.concat(valid);
+            validOptions = [...new Set([...validOptions, ...valid])];//validOptions.concat(valid);
           }
           checkValid(options, validOptions);
         }
 
         // I could immediately collapse if only one option left?
         nextGrid[index] = new Cell(options);
+        nextGrid[index].idx = index;
       }
+    }
     }
   }
 
